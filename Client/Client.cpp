@@ -7,7 +7,7 @@
 
 using namespace std;
 
-//The mail of currently logged in user
+//The mail of currently logged in user 
 string emailG = "";
 
 //Handles for all UI elements(texts, input fields, check boxes, buttons)
