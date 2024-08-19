@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\libbcrypt\include;C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\sql;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\bcryptlib\include;C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\sql;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,10 +130,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="libbcrypt\src\bcrypt.c" />
-    <ClCompile Include="libbcrypt\src\crypt_blowfish.c" />
-    <ClCompile Include="libbcrypt\src\crypt_gensalt.c" />
-    <ClCompile Include="libbcrypt\src\wrapper.c" />
+    <ClCompile Include="bcryptlib\src\bcrypt.c" />
+    <ClCompile Include="bcryptlib\src\crypt_blowfish.c" />
+    <ClCompile Include="bcryptlib\src\crypt_gensalt.c" />
+    <ClCompile Include="bcryptlib\src\wrapper.c" />
     <ClCompile Include="Server.cpp" />
     <ClCompile Include="sql\sqlite3.c" />
   </ItemGroup>
