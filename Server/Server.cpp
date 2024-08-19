@@ -1,23 +1,11 @@
-#include <iostream>
-#include <sqlite3.h>
-#include <string>
-#include <winsock2.h>
-#include <vector>
-#include <thread>
-#include "bcrypt/BCrypt.hpp"
-
-#pragma comment(lib, "ws2_32.lib")
-
-using namespace std;
-
-//Database global variable
-sqlite3* db;
+#include "Server.h"
 
 //Contain information after executing queries on data base table
 vector<string> entries;
 
 //Create database
-bool createDatabase() {
+bool createDatabase(sqlite3*& db) 
+{
     const char* sqlCreateTable = R"(
         CREATE TABLE IF NOT EXISTS Users (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,8 +36,8 @@ static int CallBack(void* unused, int count, char** data, char** columns)
 }
 
 //Add new user in the database
-bool addUser(const string& username, const string& password, const string& email) {
-
+bool addUser(const string& username, const string& password, const string& email, sqlite3*& db)
+{
     char* errorMessage = nullptr;
     //All passwords are being hashed before saving them in the database
     string sql = "INSERT INTO USERS (USERNAME, PASSWORD, EMAIL) VALUES ('" + username + "', '" + BCrypt::generateHash(password) + "', '" + email + "');";
@@ -63,8 +51,9 @@ bool addUser(const string& username, const string& password, const string& email
 }
 
 //Check if there is a user with such email and correct password
-bool loginUser(const string& email, const string& password)
+bool loginUser(const string& email, const string& password, sqlite3*& db)
 {
+    entries.clear();
     string query = "SELECT Password FROM USERS WHERE Email = '" + email + "\'";
     sqlite3_exec(db, query.c_str(), CallBack, 0, 0);
     if (entries.size() != 0) return BCrypt::validatePassword(password, entries[0]);      
@@ -72,8 +61,9 @@ bool loginUser(const string& email, const string& password)
 }
 
 //Change username of a user
-bool changeUsername(const string& newUsername, const string& password, const string& email)
+bool changeUsername(const string& newUsername, const string& password, const string& email, sqlite3*& db)
 {
+    entries.clear();
     //Get password of a user with such email
     string initQuery = "SELECT Password FROM USERS WHERE Email = '" + email + "'";
     sqlite3_exec(db, initQuery.c_str(), CallBack, 0, 0);
@@ -94,7 +84,7 @@ bool changeUsername(const string& newUsername, const string& password, const str
 }
 
 //Change password of a user
-bool changePassword(const string& newPassword, const string& email)
+bool changePassword(const string& newPassword, const string& email, sqlite3*& db)
 {
     //Hash the new password
     string query = "UPDATE Users SET Password = '" + BCrypt::generateHash(newPassword) + "' WHERE Email = '" + email + "';";
@@ -103,8 +93,10 @@ bool changePassword(const string& newPassword, const string& email)
 }
 
 //Handle the queries of the client
-void handleClient(SOCKET clientSocket) 
+void handleClient(tuple<SOCKET, sqlite3*&> buff) 
 {
+    SOCKET clientSocket = get<0>(buff);
+
     //Receive information from the client
     char buffer[1024];
     int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
@@ -113,7 +105,6 @@ void handleClient(SOCKET clientSocket)
     if (bytesReceived > 0) {
 
         //Separate and store the information from the client
-        entries.clear();
         string data(buffer), username, password, email, purpose;
         int counter = 0;
         for (int i = 0; i < data.size(); i++)
@@ -142,7 +133,7 @@ void handleClient(SOCKET clientSocket)
         //Distribute tasks depending on the type of user request
         if (purpose == "Registration")
         {
-            if (addUser(username, password, email))
+            if (addUser(username, password, email, get<1>(buff)))
                 send(clientSocket, "Success!", 9, 0);
             else 
                 send(clientSocket, "Failed to execute operation!", 29, 0);
@@ -150,21 +141,21 @@ void handleClient(SOCKET clientSocket)
         }
         else if (purpose == "Login")
         {
-               if(loginUser(email, password)) 
+               if(loginUser(email, password, get<1>(buff)))
                    send(clientSocket, "Success!", 9, 0);
                else 
                    send(clientSocket, "Failed to execute operation!", 29, 0);
         }
         else if (purpose == "ChangeUserName")
         {
-            if (changeUsername(username, password, email))
+            if (changeUsername(username, password, email, get<1>(buff)))
                 send(clientSocket, "Success!", 9, 0);
             else
                 send(clientSocket, "Failed to execute operation!", 29, 0);
         }
         else if (purpose == "ChangePassword")
         {
-            if (changePassword(password, email))
+            if (changePassword(password, email, get<1>(buff)))
                 send(clientSocket, "Success!", 9, 0);
             else
                 send(clientSocket, "Failed to execute operation!", 29, 0);
@@ -175,15 +166,12 @@ void handleClient(SOCKET clientSocket)
 }
 
 //Set the socket, address and listen for client connections
-int main() {
-
-    sqlite3_open("users.db", &db);
-    createDatabase();
-
+void handleServer(sqlite3*& db)
+{
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         cerr << "WSAStartup failed!" << endl;
-        return 1;
+        return;
     }
 
     SOCKET serverSocket;
@@ -191,7 +179,7 @@ int main() {
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
         cerr << "Can't create socket! Error: " << WSAGetLastError() << endl;
         WSACleanup();
-        return 1;
+        return;
     }
 
     sockaddr_in serverAddr;
@@ -203,14 +191,14 @@ int main() {
         cerr << "Can't bind socket! Error: " << WSAGetLastError() << endl;
         closesocket(serverSocket);
         WSACleanup();
-        return 1;
+        return;
     }
 
     if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
         cerr << "Listening failed! Error: " << WSAGetLastError() << endl;
         closesocket(serverSocket);
         WSACleanup();
-        return 1;
+        return;
     }
 
     while (true) {
@@ -219,8 +207,10 @@ int main() {
         if (clientSocket != INVALID_SOCKET) {
             cout << "Connection succeeded!" << endl;
 
+            //Collect two arguments in one
+            tuple<SOCKET, sqlite3*&> buff(clientSocket, db);
             // Create a thread for each client
-            thread clientThread(handleClient, clientSocket);
+            thread clientThread(handleClient, buff);
             clientThread.detach(); // Detach the thread to let it run independently
         }
         else
@@ -228,12 +218,25 @@ int main() {
             cerr << "Accept failed! Error: " << WSAGetLastError() << endl;
             closesocket(serverSocket);
             WSACleanup();
-            return 1;
+            return;
         }
     }
 
-    sqlite3_close(db);
+    //Close server socket
     closesocket(serverSocket);
     WSACleanup();
+}
+
+//Create or open database
+int main() //Comment before testing with doctest
+{
+    sqlite3* db;
+    sqlite3_open("users.db", &db);
+    createDatabase(db);
+
+    handleServer(db);
+    sqlite3_close(db);
+
     return 0;
 }
+

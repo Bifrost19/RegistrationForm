@@ -1,11 +1,4 @@
-#include <windows.h>
-#include <string>
-#include <random>
-#include <vector>
-
-#pragma comment(lib, "ws2_32.lib")
-
-using namespace std;
+#include "Client.h"
 
 //The mail of currently logged in user 
 string emailG = "";
@@ -22,25 +15,6 @@ HFONT hFontUnderLined = CreateFont(15, 0, 0, 0, FW_NORMAL, FALSE, TRUE, FALSE, D
 
 HFONT hCaptchaFont = CreateFont(20, 0, 0, 0, FW_NORMAL, TRUE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
     CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("Comic Sans MS"));
-
-//All pages in the app have their own unique code
-enum class Page
-{
-    REGISTER,
-    LOGIN,
-    LOGGEDIN,
-    CHANGEUSERNAME,
-    CHANGEPASSWORD
-};
-
-//Different errors with the connection server-client
-enum class Error
-{
-    DEFAULT,
-    WSASTARTUPFAILED,
-    CANTCREATESOCKET,
-    CONNECTIONFAILED
-};
 
 //Default page value
 Page page = Page::REGISTER;

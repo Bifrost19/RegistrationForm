@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\bcryptlib\include;C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\sql;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\doctest;C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\bcryptlib\include;C:\Users\Miro-GamingPC\source\repos\RegistrationForm\Server\sql;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -136,6 +136,10 @@
     <ClCompile Include="bcryptlib\src\wrapper.c" />
     <ClCompile Include="Server.cpp" />
     <ClCompile Include="sql\sqlite3.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Server.h" />
+    <ClInclude Include="ServerUnitTests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
