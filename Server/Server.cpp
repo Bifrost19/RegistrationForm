@@ -3,7 +3,7 @@
 //Contain information after executing queries on data base table
 vector<string> entries;
 
-//Create database
+//Create database 
 bool createDatabase(sqlite3*& db) 
 {
     const char* sqlCreateTable = R"(
