@@ -40,46 +40,50 @@ BOOL CALLBACK DestroyChildProc(HWND hWndChild, LPARAM lParam) {
 bool sendData(const string& username, const string& password, const string& email, const string& purpose, Error& error) {
     
     WSADATA wsaData;
-
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) 
-    {     
-        error = Error::WSASTARTUPFAILED;
-        return false;
-    }
-
     SOCKET sock;
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) 
+
+    try
     {
-        error = Error::CANTCREATESOCKET;
+        //Initialize windows socket
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) throw "WinSock";
+
+        //Initialize client socket
+        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) throw "CSock";
+
+        sockaddr_in serverAddr;
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        serverAddr.sin_port = htons(8080);
+
+        //Connect to server
+        if (connect(sock, (sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) throw "Connection";
+
+        string data = username + " " + password + " " + email + ' ' + purpose;
+        send(sock, data.c_str(), data.size(), 0);
+
+        char buffer[1024];
+        int bytesReceived = recv(sock, buffer, 1024, 0);
+        if (bytesReceived == 0) throw "Receiving failed!";
+        buffer[bytesReceived] = '\0';
+        string buffStr(buffer);
+        if (buffStr == "Failed to execute operation!") throw "Operation execution failed!";
+
+        //Close client socket
+        closesocket(sock);
         WSACleanup();
-        return false;
+        return true;
     }
-
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    serverAddr.sin_port = htons(8080);
-
-    if (connect(sock, (sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) 
+    catch (exception e)
     {
-        error = Error::CONNECTIONFAILED;
+        if(e.what() == "WinSock") error = Error::WSASTARTUPFAILED;
+        else if(e.what() == "CSock") error = Error::CANTCREATESOCKET;
+        else if(e.what() == "Connection") error = Error::CONNECTIONFAILED;
+ 
         closesocket(sock);
         WSACleanup();
         return false;
     }
 
-    string data = username + " " + password + " " + email + ' ' + purpose;
-    send(sock, data.c_str(), data.size(), 0);
-
-    char buffer[1024];
-    int bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
-    buffer[bytesReceived] = '\0';
-    string buffStr(buffer);
-    if (buffStr == "Failed to execute operation!") return false;
-
-    closesocket(sock);
-    WSACleanup();
-    return true;
 }
 
 //Check if a password contains all necessary characters
@@ -288,7 +292,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 WCHAR* captchaBoxText = new WCHAR[captchaTextBoxLen];
 
                 //Collect information from input fields and check boxes
-                GetWindowText(hUsername, username, usernameLen);
+                GetWindowText(hUsername, captchaBoxText, usernameLen);
                 GetWindowText(hPassword, password, passwordLen);
                 GetWindowText(hConfirmPassword, confirmPassword, confirmPasswordLen);
                 GetWindowText(hEmail, email, emailLen);

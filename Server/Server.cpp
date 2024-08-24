@@ -1,7 +1,7 @@
 #include "Server.h"
 
 //Contain information after executing queries on data base table
-vector<string> entries;
+thread_local vector<string> entries;
 
 //Create database 
 bool createDatabase(sqlite3*& db) 
@@ -99,10 +99,13 @@ void handleClient(tuple<SOCKET, sqlite3*&> buff)
 
     //Receive information from the client
     char buffer[1024];
-    int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-    buffer[bytesReceived] = '\0';
+    int bytesReceived;
 
-    if (bytesReceived > 0) {
+    try
+    {
+        bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        buffer[bytesReceived] = '\0';
+        if (bytesReceived == 0) throw "Receiving failed!";
 
         //Separate and store the information from the client
         string data(buffer), username, password, email, purpose;
@@ -135,16 +138,16 @@ void handleClient(tuple<SOCKET, sqlite3*&> buff)
         {
             if (addUser(username, password, email, get<1>(buff)))
                 send(clientSocket, "Success!", 9, 0);
-            else 
+            else
                 send(clientSocket, "Failed to execute operation!", 29, 0);
 
         }
         else if (purpose == "Login")
         {
-               if(loginUser(email, password, get<1>(buff)))
-                   send(clientSocket, "Success!", 9, 0);
-               else 
-                   send(clientSocket, "Failed to execute operation!", 29, 0);
+            if (loginUser(email, password, get<1>(buff)))
+                send(clientSocket, "Success!", 9, 0);
+            else
+                send(clientSocket, "Failed to execute operation!", 29, 0);
         }
         else if (purpose == "ChangeUserName")
         {
@@ -161,6 +164,11 @@ void handleClient(tuple<SOCKET, sqlite3*&> buff)
                 send(clientSocket, "Failed to execute operation!", 29, 0);
         }
     }
+    catch (exception e)
+    {
+        cout << "Error: " << e.what() << endl;
+        closesocket(clientSocket);
+    }
 
     closesocket(clientSocket);
 }
@@ -169,42 +177,43 @@ void handleClient(tuple<SOCKET, sqlite3*&> buff)
 void handleServer(sqlite3*& db)
 {
     WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        cerr << "WSAStartup failed!" << endl;
-        return;
-    }
-
     SOCKET serverSocket;
 
-    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        cerr << "Can't create socket! Error: " << WSAGetLastError() << endl;
-        WSACleanup();
-        return;
+    try
+    {
+        //Initialize Win socket
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) throw "Windows socket initialization failed!";
+
+        //Initialize server socket
+        if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) throw "Server socket initialization failed!";
+
+        sockaddr_in serverAddr;
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = INADDR_ANY;
+        serverAddr.sin_port = htons(8080);
+
+        //Bind the socket to an address
+        if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) throw "Binding failed!";
+
+        //Set the server socket to listen for client connections
+        if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) throw "Listening failed!";
     }
-
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(8080);
-
-    if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        cerr << "Can't bind socket! Error: " << WSAGetLastError() << endl;
+    catch (exception e)
+    {
+        cerr << "Error: " << e.what() << endl;
         closesocket(serverSocket);
         WSACleanup();
         return;
     }
 
-    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
-        cerr << "Listening failed! Error: " << WSAGetLastError() << endl;
-        closesocket(serverSocket);
-        WSACleanup();
-        return;
-    }
-
-    while (true) {
+    while (true) 
+    {
         cout << "...Waiting for connection..." << endl;
-        SOCKET clientSocket = accept(serverSocket, nullptr, nullptr);
-        if (clientSocket != INVALID_SOCKET) {
+
+        try
+        {
+            SOCKET clientSocket = accept(serverSocket, nullptr, nullptr);
+            if (clientSocket == INVALID_SOCKET) throw "Invalid socket";
             cout << "Connection succeeded!" << endl;
 
             //Collect two arguments in one
@@ -213,13 +222,14 @@ void handleServer(sqlite3*& db)
             thread clientThread(handleClient, buff);
             clientThread.detach(); // Detach the thread to let it run independently
         }
-        else
+        catch (exception e)
         {
-            cerr << "Accept failed! Error: " << WSAGetLastError() << endl;
+            cerr << "Error: " << e.what() << endl;
             closesocket(serverSocket);
             WSACleanup();
             return;
         }
+
     }
 
     //Close server socket
